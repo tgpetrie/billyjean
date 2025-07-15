@@ -11,6 +11,6 @@ CONFIG = {
     'MAX_COINS_PER_CATEGORY': int(os.environ.get('MAX_COINS_PER_CATEGORY', 15)),
     'MIN_VOLUME_THRESHOLD': int(os.environ.get('MIN_VOLUME_THRESHOLD', 1000000)),
     'MIN_CHANGE_THRESHOLD': float(os.environ.get('MIN_CHANGE_THRESHOLD', 1.0)),
-    'API_TIMEOUT': int(os.environ.get('API_TIMEOUT', 10)),
+    'API_TIMEOUT': int(os.environ.get('API_TIMEOUT', 30)),
     'CHART_DAYS_LIMIT': int(os.environ.get('CHART_DAYS_LIMIT', 30)),
 }

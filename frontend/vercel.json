@@ -4,13 +4,14 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://skywalker-backend.onrender.com/api/$1"
+      "destination": "https://billyjean.onrender.com/api/$1"
     }
   ],
   "build": {
     "env": {
-      "VITE_API_URL": "https://skywalker-backend.onrender.com"
-    }
+      "VITE_API_URL": "https://billyjean.onrender.com"
+    },
+    "nodeVersion": "20.x"
   },
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
