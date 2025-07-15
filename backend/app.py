@@ -16,6 +16,9 @@ from config import CONFIG
 from logging_config import setup_logging
 from logging_config import log_config as log_config_with_param
 from utils import find_available_port
+import ssl
+from urllib3 import PoolManager
+from requests.adapters import HTTPAdapter
 
 # Production-ready imports
 from dotenv import load_dotenv
@@ -137,6 +140,13 @@ def find_available_port(start_port=5001, max_attempts=10):
     logging.error(f"Could not find available port in range {start_port}-{start_port + max_attempts}")
     return None
 
+class TLSAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        context = ssl.create_default_context()
+        context.minimum_version = ssl.TLSVersion.TLSv1_2  # Enforcing TLSv1.2 or higher
+        kwargs['ssl_context'] = context
+        return super().init_poolmanager(*args, **kwargs)
+
 def kill_process_on_port(port):
     """Kill process using the specified port"""
     import subprocess
@@ -145,7 +155,7 @@ def kill_process_on_port(port):
     try:
         if sys.platform.startswith('darwin') or sys.platform.startswith('linux'):
             # macOS/Linux
-            result = subprocess.run(['lsof', '-ti', f':{port}'], 
+            result = subprocess.run(['lsof', '-ti', f':{port}'],
                                  capture_output=True, text=True)
             if result.returncode == 0 and result.stdout.strip():
                 pids = result.stdout.strip().split('\n')
@@ -209,20 +219,23 @@ def update_config(new_config):
 def get_coinbase_prices():
     """Fetch current prices from Coinbase (optimized for speed)"""
     try:
+        s = requests.Session()
+        s.mount('https://', TLSAdapter())
+
         products_url = "https://api.exchange.coinbase.com/products"
-        products_response = requests.get(products_url, timeout=CONFIG['API_TIMEOUT'])
+        products_response = s.get(products_url, timeout=CONFIG['API_TIMEOUT'])
         if products_response.status_code == 200:
             products = products_response.json()
             current_prices = {}
             
             # Filter to USD pairs only and prioritize major coins
-            usd_products = [p for p in products 
-                          if p.get("quote_currency") == "USD" 
+            usd_products = [p for p in products
+                          if p.get("quote_currency") == "USD"
                           and p.get("status") == "online"]
             
             # Prioritize major cryptocurrencies for faster loading
             major_coins = [
-                'BTC-USD', 'ETH-USD', 'SOL-USD', 'ADA-USD', 'DOT-USD', 
+                'BTC-USD', 'ETH-USD', 'SOL-USD', 'ADA-USD', 'DOT-USD',
                 'LINK-USD', 'MATIC-USD', 'AVAX-USD', 'ATOM-USD', 'ALGO-USD',
                 'XRP-USD', 'DOGE-USD', 'SHIB-USD', 'UNI-USD', 'AAVE-USD',
                 'BCH-USD', 'LTC-USD', 'ICP-USD', 'HYPE-USD', 'SPX-USD',
@@ -250,7 +263,7 @@ def get_coinbase_prices():
                 symbol = product["id"]
                 ticker_url = f"https://api.exchange.coinbase.com/products/{symbol}/ticker"
                 try:
-                    ticker_response = requests.get(ticker_url, timeout=1.5)
+                    ticker_response = s.get(ticker_url, timeout=1.5) # Use session 's'
                     if ticker_response.status_code == 200:
                         ticker_data = ticker_response.json()
                         price = float(ticker_data.get('price', 0))
@@ -263,7 +276,7 @@ def get_coinbase_prices():
             # Use ThreadPoolExecutor for faster concurrent API calls
             with ThreadPoolExecutor(max_workers=10) as executor:
                 # Submit all tasks
-                future_to_product = {executor.submit(fetch_ticker, product): product 
+                future_to_product = {executor.submit(fetch_ticker, product): product
                                    for product in all_products[:50]}
                 
                 # Collect results as they complete
@@ -402,8 +415,11 @@ def get_24h_top_movers():
 def get_coinbase_24h_top_movers():
     """Fetch 24h top movers from Coinbase as backup (OPTIMIZED)"""
     try:
+        s = requests.Session()
+        s.mount('https://', TLSAdapter())
+
         products_url = "https://api.exchange.coinbase.com/products"
-        products_response = requests.get(products_url, timeout=CONFIG['API_TIMEOUT'])
+        products_response = s.get(products_url, timeout=CONFIG['API_TIMEOUT'])
         if products_response.status_code != 200:
             return []
 
@@ -416,13 +432,13 @@ def get_coinbase_24h_top_movers():
             try:
                 # Get 24h stats
                 stats_url = f"https://api.exchange.coinbase.com/products/{product['id']}/stats"
-                stats_response = requests.get(stats_url, timeout=3)
+                stats_response = s.get(stats_url, timeout=3) # Use session 's'
                 if stats_response.status_code != 200:
                     return None
 
                 # Get current price
                 ticker_url = f"https://api.exchange.coinbase.com/products/{product['id']}/ticker"
-                ticker_response = requests.get(ticker_url, timeout=2)
+                ticker_response = s.get(ticker_url, timeout=2) # Use session 's'
                 if ticker_response.status_code != 200:
                     return None
 
@@ -634,6 +650,9 @@ def get_crypto_data():
 def get_historical_chart_data(symbol, days=7):
     """Fetch historical price data for charts from Coinbase"""
     try:
+        s = requests.Session()
+        s.mount('https://', TLSAdapter())
+
         # Convert days to start and end timestamps
         end_time = datetime.now()
         start_time = end_time - timedelta(days=days)
@@ -654,7 +673,7 @@ def get_historical_chart_data(symbol, days=7):
             'granularity': granularity
         }
 
-        response = requests.get(url, params=params, timeout=CONFIG['API_TIMEOUT'])
+        response = s.get(url, params=params, timeout=CONFIG['API_TIMEOUT']) # Use session 's'
 
         if response.status_code == 200:
             data = response.json()
