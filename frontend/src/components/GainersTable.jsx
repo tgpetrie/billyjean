@@ -179,3 +179,5 @@ const GainersTable = ({ refreshTrigger }) => {
     </div>
   );
 };
+
+export default GainersTable;

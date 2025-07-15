@@ -181,3 +181,5 @@ const LosersTable = ({ refreshTrigger }) => {
     </div>
   );
 }
+
+export default LosersTable;
