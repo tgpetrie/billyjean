@@ -12,7 +12,6 @@ from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 from datetime import datetime, timedelta
-from config import CONFIG
 from logging_config import setup_logging
 from logging_config import log_config as log_config_with_param
 from utils import find_available_port
@@ -66,8 +65,6 @@ if SENTRY_AVAILABLE and os.environ.get('SENTRY_DSN'):
 # Setup logging
 setup_logging()
 
-# Log configuration
-log_config_with_param(CONFIG)
 
 # Flask App Setup
 app = Flask(__name__)
@@ -100,6 +97,9 @@ CONFIG = {
     'API_TIMEOUT': int(os.environ.get('API_TIMEOUT', 30)),  # API request timeout
     'CHART_DAYS_LIMIT': int(os.environ.get('CHART_DAYS_LIMIT', 30)),  # Max days for chart data
 }
+
+# Log configuration
+log_config_with_param(CONFIG)
 
 # Cache and price history storage
 cache = {
@@ -1174,14 +1174,14 @@ def root():
         "description": "Individual component endpoints with correct time frames",
         "individual_component_endpoints": [
             "/api/component/top-banner-scroll",     # Top scrolling banner - 1-hour PRICE change
-            "/api/component/bottom-banner-scroll",  # Bottom scrolling banner - 1-hour VOLUME change  
+            "/api/component/bottom-banner-scroll",  # Bottom scrolling banner - 1-hour VOLUME change
             "/api/component/gainers-table",         # Gainers table - 3-minute data (main feature)
             "/api/component/losers-table",          # Losers table - 3-minute data (main feature)
             "/api/component/top-movers-bar"         # Horizontal top movers bar - 3-minute data
         ],
         "time_frame_specification": {
             "top_banner": "1-hour price change data",
-            "bottom_banner": "1-hour volume change data", 
+            "bottom_banner": "1-hour volume change data",
             "main_tables": "3-minute gainers/losers data (key feature)",
             "top_movers_bar": "3-minute data"
         },
@@ -1195,7 +1195,8 @@ def root():
             "/api/chart/BTC-USD",
             "/api/watchlist",
             "/api/config"
-        ]
+        ],
+        "current_config_debug": CONFIG # Add CONFIG for debugging
     })
 
 @app.route('/api/crypto')
