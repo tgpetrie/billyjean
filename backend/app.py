@@ -97,7 +97,7 @@ CONFIG = {
     'MAX_COINS_PER_CATEGORY': int(os.environ.get('MAX_COINS_PER_CATEGORY', 15)),  # Max coins to return
     'MIN_VOLUME_THRESHOLD': int(os.environ.get('MIN_VOLUME_THRESHOLD', 1000000)),  # Minimum volume for banner
     'MIN_CHANGE_THRESHOLD': float(os.environ.get('MIN_CHANGE_THRESHOLD', 1.0)),  # Minimum % change for banner
-    'API_TIMEOUT': int(os.environ.get('API_TIMEOUT', 10)),  # API request timeout
+    'API_TIMEOUT': int(os.environ.get('API_TIMEOUT', 30)),  # API request timeout
     'CHART_DAYS_LIMIT': int(os.environ.get('CHART_DAYS_LIMIT', 30)),  # Max days for chart data
 }
 
