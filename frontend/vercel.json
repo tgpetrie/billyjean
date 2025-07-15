@@ -10,8 +10,7 @@
   "build": {
     "env": {
       "VITE_API_URL": "https://billyjean-backend-5032385663.us-central1.run.app"
-    },
-    "nodeVersion": "20.x"
+    }
   },
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
