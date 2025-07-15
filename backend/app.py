@@ -219,77 +219,77 @@ def update_config(new_config):
 def get_coinbase_prices():
     """Fetch current prices from Coinbase (optimized for speed)"""
     try:
-        s = requests.Session()
-        s.mount('https://', TLSAdapter())
+        with requests.Session() as s: # Use with statement for session
+            s.mount('https://', TLSAdapter())
 
-        products_url = "https://api.exchange.coinbase.com/products"
-        products_response = s.get(products_url, timeout=CONFIG['API_TIMEOUT'])
-        if products_response.status_code == 200:
-            products = products_response.json()
-            current_prices = {}
-            
-            # Filter to USD pairs only and prioritize major coins
-            usd_products = [p for p in products
-                          if p.get("quote_currency") == "USD"
-                          and p.get("status") == "online"]
-            
-            # Prioritize major cryptocurrencies for faster loading
-            major_coins = [
-                'BTC-USD', 'ETH-USD', 'SOL-USD', 'ADA-USD', 'DOT-USD',
-                'LINK-USD', 'MATIC-USD', 'AVAX-USD', 'ATOM-USD', 'ALGO-USD',
-                'XRP-USD', 'DOGE-USD', 'SHIB-USD', 'UNI-USD', 'AAVE-USD',
-                'BCH-USD', 'LTC-USD', 'ICP-USD', 'HYPE-USD', 'SPX-USD',
-                'SEI-USD', 'PI-USD', 'KAIA-USD', 'INJ-USD', 'ONDO-USD',
-                'CRO-USD', 'FLR-USD', 'WLD-USD', 'POL-USD', 'WBT-USD',
-                'JUP-USD', 'SKY-USD', 'TAO-USD'
-            ]
-            
-            # Reorder products to prioritize major coins
-            prioritized_products = []
-            remaining_products = []
-            
-            for product in usd_products:
-                if product["id"] in major_coins:
-                    prioritized_products.append(product)
-                else:
-                    remaining_products.append(product)
-            
-            # Combine prioritized + remaining, but limit total to 100 for speed
-            all_products = prioritized_products + remaining_products[:100-len(prioritized_products)]
-            
-            # Use ThreadPoolExecutor for concurrent API calls
-            def fetch_ticker(product):
-                """Fetch ticker data for a single product"""
-                symbol = product["id"]
-                ticker_url = f"https://api.exchange.coinbase.com/products/{symbol}/ticker"
-                try:
-                    ticker_response = s.get(ticker_url, timeout=1.5) # Use session 's'
-                    if ticker_response.status_code == 200:
-                        ticker_data = ticker_response.json()
-                        price = float(ticker_data.get('price', 0))
-                        if price > 0:
-                            return symbol, price
-                except Exception as ticker_error:
-                    logging.warning(f"Failed to get ticker for {symbol}: {ticker_error}")
-                return None, None
-
-            # Use ThreadPoolExecutor for faster concurrent API calls
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                # Submit all tasks
-                future_to_product = {executor.submit(fetch_ticker, product): product
-                                   for product in all_products[:50]}
+            products_url = "https://api.exchange.coinbase.com/products"
+            products_response = s.get(products_url, timeout=CONFIG['API_TIMEOUT'])
+            if products_response.status_code == 200:
+                products = products_response.json()
+                current_prices = {}
                 
-                # Collect results as they complete
-                for future in as_completed(future_to_product):
-                    symbol, price = future.result()
-                    if symbol and price:
-                        current_prices[symbol] = price
-            
-            logging.info(f"Successfully fetched {len(current_prices)} prices from Coinbase")
-            return current_prices
-        else:
-            logging.error(f"Coinbase products API Error: {products_response.status_code}")
-            return {}
+                # Filter to USD pairs only and prioritize major coins
+                usd_products = [p for p in products
+                              if p.get("quote_currency") == "USD"
+                              and p.get("status") == "online"]
+                
+                # Prioritize major cryptocurrencies for faster loading
+                major_coins = [
+                    'BTC-USD', 'ETH-USD', 'SOL-USD', 'ADA-USD', 'DOT-USD',
+                    'LINK-USD', 'MATIC-USD', 'AVAX-USD', 'ATOM-USD', 'ALGO-USD',
+                    'XRP-USD', 'DOGE-USD', 'SHIB-USD', 'UNI-USD', 'AAVE-USD',
+                    'BCH-USD', 'LTC-USD', 'ICP-USD', 'HYPE-USD', 'SPX-USD',
+                    'SEI-USD', 'PI-USD', 'KAIA-USD', 'INJ-USD', 'ONDO-USD',
+                    'CRO-USD', 'FLR-USD', 'WLD-USD', 'POL-USD', 'WBT-USD',
+                    'JUP-USD', 'SKY-USD', 'TAO-USD'
+                ]
+                
+                # Reorder products to prioritize major coins
+                prioritized_products = []
+                remaining_products = []
+                
+                for product in usd_products:
+                    if product["id"] in major_coins:
+                        prioritized_products.append(product)
+                    else:
+                        remaining_products.append(product)
+                
+                # Combine prioritized + remaining, but limit total to 100 for speed
+                all_products = prioritized_products + remaining_products[:100-len(prioritized_products)]
+                
+                # Use ThreadPoolExecutor for concurrent API calls
+                def fetch_ticker(product):
+                    """Fetch ticker data for a single product"""
+                    symbol = product["id"]
+                    ticker_url = f"https://api.exchange.coinbase.com/products/{symbol}/ticker"
+                    try:
+                        ticker_response = s.get(ticker_url, timeout=1.5) # Use session 's'
+                        if ticker_response.status_code == 200:
+                            ticker_data = ticker_response.json()
+                            price = float(ticker_data.get('price', 0))
+                            if price > 0:
+                                return symbol, price
+                    except Exception as ticker_error:
+                        logging.warning(f"Failed to get ticker for {symbol}: {ticker_error}")
+                    return None, None
+
+                # Use ThreadPoolExecutor for faster concurrent API calls
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    # Submit all tasks
+                    future_to_product = {executor.submit(fetch_ticker, product): product
+                                       for product in all_products[:50]}
+                    
+                    # Collect results as they complete
+                    for future in as_completed(future_to_product):
+                        symbol, price = future.result()
+                        if symbol and price:
+                            current_prices[symbol] = price
+                
+                logging.info(f"Successfully fetched {len(current_prices)} prices from Coinbase")
+                return current_prices
+            else:
+                logging.error(f"Coinbase products API Error: {products_response.status_code}")
+                return {}
     except Exception as e:
         logging.error(f"Error fetching current prices from Coinbase: {e}")
         return {}
@@ -415,105 +415,105 @@ def get_24h_top_movers():
 def get_coinbase_24h_top_movers():
     """Fetch 24h top movers from Coinbase as backup (OPTIMIZED)"""
     try:
-        s = requests.Session()
-        s.mount('https://', TLSAdapter())
+        with requests.Session() as s: # Use with statement for session
+            s.mount('https://', TLSAdapter())
 
-        products_url = "https://api.exchange.coinbase.com/products"
-        products_response = s.get(products_url, timeout=CONFIG['API_TIMEOUT'])
-        if products_response.status_code != 200:
-            return []
+            products_url = "https://api.exchange.coinbase.com/products"
+            products_response = s.get(products_url, timeout=CONFIG['API_TIMEOUT'])
+            if products_response.status_code != 200:
+                return []
 
-        products = products_response.json()
-        usd_products = [p for p in products if p["quote_currency"] == "USD" and p["status"] == "online"]
-        formatted_data = []
+            products = products_response.json()
+            usd_products = [p for p in products if p["quote_currency"] == "USD" and p["status"] == "online"]
+            formatted_data = []
 
-        def fetch_product_data(product):
-            """Fetch stats and ticker data for a single product concurrently"""
-            try:
-                # Get 24h stats
-                stats_url = f"https://api.exchange.coinbase.com/products/{product['id']}/stats"
-                stats_response = s.get(stats_url, timeout=3) # Use session 's'
-                if stats_response.status_code != 200:
+            def fetch_product_data(product):
+                """Fetch stats and ticker data for a single product concurrently"""
+                try:
+                    # Get 24h stats
+                    stats_url = f"https://api.exchange.coinbase.com/products/{product['id']}/stats"
+                    stats_response = s.get(stats_url, timeout=3) # Use session 's'
+                    if stats_response.status_code != 200:
+                        return None
+
+                    # Get current price
+                    ticker_url = f"https://api.exchange.coinbase.com/products/{product['id']}/ticker"
+                    ticker_response = s.get(ticker_url, timeout=2) # Use session 's'
+                    if ticker_response.status_code != 200:
+                        return None
+
+                    stats_data = stats_response.json()
+                    ticker_data = ticker_response.json()
+
+                    current_price = float(ticker_data.get('price', 0))
+                    volume_24h = float(stats_data.get('volume', 0))
+                    open_24h = float(stats_data.get('open', 0))
+                    
+                    if current_price > 0 and open_24h > 0:
+                        price_change_24h = ((current_price - open_24h) / open_24h) * 100
+                        
+                        # Estimate 1h change
+                        price_1h_estimate = current_price - ((current_price - open_24h) * 0.04)
+                        price_change_1h = ((current_price - price_1h_estimate) / price_1h_estimate) * 100 if price_1h_estimate > 0 else 0
+                        
+                        # Only include significant moves
+                        if abs(price_change_24h) >= CONFIG['MIN_CHANGE_THRESHOLD'] and volume_24h > CONFIG['MIN_VOLUME_THRESHOLD']:
+                            return {
+                                "symbol": product["id"],
+                                "current_price": current_price,
+                                "initial_price_24h": open_24h,
+                                "initial_price_1h": price_1h_estimate,
+                                "price_change_24h": price_change_24h,
+                                "price_change_1h": price_change_1h,
+                                "volume_24h": volume_24h,
+                                "market_cap": 0
+                            }
+                except Exception as e:
+                    logging.warning(f"Error processing Coinbase 24h data for {product['id']}: {e}")
                     return None
 
-                # Get current price
-                ticker_url = f"https://api.exchange.coinbase.com/products/{product['id']}/ticker"
-                ticker_response = s.get(ticker_url, timeout=2) # Use session 's'
-                if ticker_response.status_code != 200:
-                    return None
-
-                stats_data = stats_response.json()
-                ticker_data = ticker_response.json()
-
-                current_price = float(ticker_data.get('price', 0))
-                volume_24h = float(stats_data.get('volume', 0))
-                open_24h = float(stats_data.get('open', 0))
+            # Use ThreadPoolExecutor for concurrent API calls (SPEED OPTIMIZATION)
+            with ThreadPoolExecutor(max_workers=15) as executor:
+                # Submit all tasks
+                future_to_product = {executor.submit(fetch_product_data, product): product
+                                   for product in usd_products[:100]}  # Increased to 100 for more data
                 
-                if current_price > 0 and open_24h > 0:
-                    price_change_24h = ((current_price - open_24h) / open_24h) * 100
-                    
-                    # Estimate 1h change
-                    price_1h_estimate = current_price - ((current_price - open_24h) * 0.04)
-                    price_change_1h = ((current_price - price_1h_estimate) / price_1h_estimate) * 100 if price_1h_estimate > 0 else 0
-                    
-                    # Only include significant moves
-                    if abs(price_change_24h) >= CONFIG['MIN_CHANGE_THRESHOLD'] and volume_24h > CONFIG['MIN_VOLUME_THRESHOLD']:
-                        return {
-                            "symbol": product["id"],
-                            "current_price": current_price,
-                            "initial_price_24h": open_24h,
-                            "initial_price_1h": price_1h_estimate,
-                            "price_change_24h": price_change_24h,
-                            "price_change_1h": price_change_1h,
-                            "volume_24h": volume_24h,
-                            "market_cap": 0
-                        }
-            except Exception as e:
-                logging.warning(f"Error processing Coinbase 24h data for {product['id']}: {e}")
-                return None
+                # Collect results as they complete
+                for future in as_completed(future_to_product):
+                    result = future.result()
+                    if result:
+                        formatted_data.append(result)
 
-        # Use ThreadPoolExecutor for concurrent API calls (SPEED OPTIMIZATION)
-        with ThreadPoolExecutor(max_workers=15) as executor:
-            # Submit all tasks
-            future_to_product = {executor.submit(fetch_product_data, product): product
-                               for product in usd_products[:100]}  # Increased to 100 for more data
+            # Sort by 24h percentage change (absolute value)
+            formatted_data.sort(key=lambda x: abs(x["price_change_24h"]), reverse=True)
+
+            # Separate gainers and losers based on thresholds
+            gainers_threshold = [coin for coin in formatted_data if coin["price_change_24h"] > 0 and abs(coin["price_change_24h"]) >= CONFIG['MIN_CHANGE_THRESHOLD'] and coin["volume_24h"] > CONFIG['MIN_VOLUME_THRESHOLD']]
+            losers_threshold = [coin for coin in formatted_data if coin["price_change_24h"] < 0 and abs(coin["price_change_24h"]) >= CONFIG['MIN_CHANGE_THRESHOLD'] and coin["volume_24h"] > CONFIG['MIN_VOLUME_THRESHOLD']]
+
+            # Ensure we have at least 10 gainers and 10 losers for the banner, if possible
+            gainers_24h = gainers_threshold[:10]
+            losers_24h = losers_threshold[:10]
+
+            # If not enough gainers/losers, fill with next best from the overall sorted list
+            if len(gainers_24h) < 10:
+                remaining_gainers = [coin for coin in formatted_data if coin["price_change_24h"] > 0 and coin not in gainers_24h]
+                gainers_24h.extend(remaining_gainers[:10 - len(gainers_24h)])
             
-            # Collect results as they complete
-            for future in as_completed(future_to_product):
-                result = future.result()
-                if result:
-                    formatted_data.append(result)
-
-        # Sort by 24h percentage change (absolute value)
-        formatted_data.sort(key=lambda x: abs(x["price_change_24h"]), reverse=True)
-
-        # Separate gainers and losers based on thresholds
-        gainers_threshold = [coin for coin in formatted_data if coin["price_change_24h"] > 0 and abs(coin["price_change_24h"]) >= CONFIG['MIN_CHANGE_THRESHOLD'] and coin["volume_24h"] > CONFIG['MIN_VOLUME_THRESHOLD']]
-        losers_threshold = [coin for coin in formatted_data if coin["price_change_24h"] < 0 and abs(coin["price_change_24h"]) >= CONFIG['MIN_CHANGE_THRESHOLD'] and coin["volume_24h"] > CONFIG['MIN_VOLUME_THRESHOLD']]
-
-        # Ensure we have at least 10 gainers and 10 losers for the banner, if possible
-        gainers_24h = gainers_threshold[:10]
-        losers_24h = losers_threshold[:10]
-
-        # If not enough gainers/losers, fill with next best from the overall sorted list
-        if len(gainers_24h) < 10:
-            remaining_gainers = [coin for coin in formatted_data if coin["price_change_24h"] > 0 and coin not in gainers_24h]
-            gainers_24h.extend(remaining_gainers[:10 - len(gainers_24h)])
-        
-        if len(losers_24h) < 10:
-            remaining_losers = [coin for coin in formatted_data if coin["price_change_24h"] < 0 and coin not in losers_24h]
-            losers_24h.extend(remaining_losers[:10 - len(losers_24h)])
-        
-        banner_mix = []
-        max_length = max(len(gainers_24h), len(losers_24h))
-        for i in range(max_length):
-            if i < len(gainers_24h):
-                banner_mix.append(gainers_24h[i])
-            if i < len(losers_24h):
-                banner_mix.append(losers_24h[i])
-        
-        logging.info(f"Successfully fetched Coinbase 24h top movers: {len(gainers_24h)} gainers, {len(losers_24h)} losers. Total for banner: {len(banner_mix)}")
-        return banner_mix[:20] # Ensure max 20 for the banner
+            if len(losers_24h) < 10:
+                remaining_losers = [coin for coin in formatted_data if coin["price_change_24h"] < 0 and coin not in losers_24h]
+                losers_24h.extend(remaining_losers[:10 - len(losers_24h)])
+            
+            banner_mix = []
+            max_length = max(len(gainers_24h), len(losers_24h))
+            for i in range(max_length):
+                if i < len(gainers_24h):
+                    banner_mix.append(gainers_24h[i])
+                if i < len(losers_24h):
+                    banner_mix.append(losers_24h[i])
+            
+            logging.info(f"Successfully fetched Coinbase 24h top movers: {len(gainers_24h)} gainers, {len(losers_24h)} losers. Total for banner: {len(banner_mix)}")
+            return banner_mix[:20] # Ensure max 20 for the banner
     except Exception as e:
         logging.error(f"Error fetching 24h top movers from Coinbase: {e}")
         return []
@@ -650,55 +650,55 @@ def get_crypto_data():
 def get_historical_chart_data(symbol, days=7):
     """Fetch historical price data for charts from Coinbase"""
     try:
-        s = requests.Session()
-        s.mount('https://', TLSAdapter())
+        with requests.Session() as s: # Use with statement for session
+            s.mount('https://', TLSAdapter())
 
-        # Convert days to start and end timestamps
-        end_time = datetime.now()
-        start_time = end_time - timedelta(days=days)
+            # Convert days to start and end timestamps
+            end_time = datetime.now()
+            start_time = end_time - timedelta(days=days)
 
-        # Determine granularity based on days
-        # Coinbase Pro API granularities: 60, 300, 900, 3600, 21600, 86400
-        if days <= 1: # Up to 1 day, use 1-minute granularity
-            granularity = 60
-        elif days <= 7: # Up to 7 days, use 1-hour granularity
-            granularity = 3600
-        else: # More than 7 days, use 1-day granularity
-            granularity = 86400
+            # Determine granularity based on days
+            # Coinbase Pro API granularities: 60, 300, 900, 3600, 21600, 86400
+            if days <= 1: # Up to 1 day, use 1-minute granularity
+                granularity = 60
+            elif days <= 7: # Up to 7 days, use 1-hour granularity
+                granularity = 3600
+            else: # More than 7 days, use 1-day granularity
+                granularity = 86400
 
-        url = f"https://api.exchange.coinbase.com/products/{symbol}/candles"
-        params = {
-            'start': start_time.isoformat(),
-            'end': end_time.isoformat(),
-            'granularity': granularity
-        }
+            url = f"https://api.exchange.coinbase.com/products/{symbol}/candles"
+            params = {
+                'start': start_time.isoformat(),
+                'end': end_time.isoformat(),
+                'granularity': granularity
+            }
 
-        response = s.get(url, params=params, timeout=CONFIG['API_TIMEOUT']) # Use session 's'
+            response = s.get(url, params=params, timeout=CONFIG['API_TIMEOUT']) # Use session 's'
 
-        if response.status_code == 200:
-            data = response.json()
-            chart_data = []
-            for entry in data:
-                timestamp = entry[0] * 1000  # Convert to milliseconds
-                price = entry[4]  # Close price
-                volume = entry[5]
+            if response.status_code == 200:
+                data = response.json()
+                chart_data = []
+                for entry in data:
+                    timestamp = entry[0] * 1000  # Convert to milliseconds
+                    price = entry[4]  # Close price
+                    volume = entry[5]
 
-                chart_data.append({
-                    'timestamp': timestamp,
-                    'datetime': datetime.fromtimestamp(timestamp / 1000).isoformat(),
-                    'price': round(price, 6),
-                    'volume': round(volume, 2)
-                })
-            
-            # Sort by timestamp in ascending order (Coinbase returns in descending)
-            chart_data.sort(key=lambda x: x['timestamp'])
+                    chart_data.append({
+                        'timestamp': timestamp,
+                        'datetime': datetime.fromtimestamp(timestamp / 1000).isoformat(),
+                        'price': round(price, 6),
+                        'volume': round(volume, 2)
+                    })
+                
+                # Sort by timestamp in ascending order (Coinbase returns in descending)
+                chart_data.sort(key=lambda x: x['timestamp'])
 
-            logging.info(f"Successfully fetched {len(chart_data)} chart points for {symbol} from Coinbase")
-            return chart_data
+                logging.info(f"Successfully fetched {len(chart_data)} chart points for {symbol} from Coinbase")
+                return chart_data
 
-        else:
-            logging.error(f"Coinbase chart API Error for {symbol}: {response.status_code} - {response.text}")
-            return []
+            else:
+                logging.error(f"Coinbase chart API Error for {symbol}: {response.status_code} - {response.text}")
+                return []
 
     except requests.RequestException as e:
         logging.error(f"Network error fetching chart data for {symbol}: {e}")
