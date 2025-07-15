@@ -1342,6 +1342,14 @@ def get_market_overview():
         logging.error(f"Error fetching market overview: {e}")
         return jsonify({"error": "Failed to fetch market overview"}), 500
 
+@app.route('/api/debug-config')
+def debug_config():
+    """Temporary endpoint to debug current configuration"""
+    return jsonify({
+        "current_config": CONFIG,
+        "env_vars": dict(os.environ) # Show all environment variables
+    })
+
 @app.route('/api/config')
 def get_config():
     """Get current configuration"""
